@@ -48,6 +48,9 @@ function BaseProvider:_retrieve_response(context)
   end
 
   local str = table.concat(result, "\n")
+  if vim.trim(str) == "" then
+    str = context.provider_stdout
+  end
   logger:debug("retrieve_results", "results", str)
 
   return true, str

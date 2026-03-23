@@ -72,6 +72,7 @@ local filetype_map = {
 --- @field _99 _99.State
 ---@diagnostic disable-next-line: undefined-doc-name
 --- @field _proc vim.SystemObj?
+--- @field provider_stdout string?
 local Prompt = {}
 Prompt.__index = Prompt
 
@@ -260,8 +261,18 @@ function Prompt:_observer(obs)
       if obs then
         obs.on_stdout(line)
       end
+      self:_persist_provider_response(line)
     end,
   }
+end
+
+--- for every valid response from provider concat the information with the
+--- actual_provider_response
+--- @param response_line string
+function Prompt:_persist_provider_response(response_line)
+  if type(response_line) == "string" and vim.trim(response_line) ~= "" then
+    self.provider_stdout = (self.provider_stdout or "") .. response_line
+  end
 end
 
 local allowed_context_types = {
@@ -330,7 +341,7 @@ function Prompt:cancel()
     self._proc = nil
     pcall(function()
       local sigterm = (vim.uv and vim.uv.constants and vim.uv.constants.SIGTERM)
-        or 15
+          or 15
       ---@diagnostic disable-next-line: undefined-field
       proc:kill(sigterm)
     end)
@@ -490,7 +501,7 @@ function Prompt:finalize()
   local ok, visual_data = pcall(self.visual_data, self)
   if ok then
     local f_loc =
-      self._99.prompts.get_file_location(self.full_path, visual_data.range)
+        self._99.prompts.get_file_location(self.full_path, visual_data.range)
     table.insert(self.agent_context, f_loc)
     table.insert(
       self.agent_context,
@@ -503,9 +514,9 @@ function Prompt:finalize()
   )
 
   if
-    self.operation == "visual"
-    or self.operation == "tutorial"
-    or self.operation == "search"
+      self.operation == "visual"
+      or self.operation == "tutorial"
+      or self.operation == "search"
   then
     table.insert(self.agent_context, self._99.prompts.only_tmp_file_change())
   end
