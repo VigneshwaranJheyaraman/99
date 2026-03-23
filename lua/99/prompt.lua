@@ -73,6 +73,7 @@ local filetype_map = {
 ---@diagnostic disable-next-line: undefined-doc-name
 --- @field _proc vim.SystemObj?
 --- @field provider_stdout string?
+--- @field is_planning boolean?
 local Prompt = {}
 Prompt.__index = Prompt
 
@@ -186,6 +187,14 @@ function Prompt.visual(_99)
   }
   context.logger:debug("99 Request", "method", "visual")
 
+  return context
+end
+
+-- @param _99 _99.State
+-- @return _99.Prompt
+function Prompt.visual_analyze(_99)
+  local context = Prompt.visual(_99)
+  context.is_planning = true
   return context
 end
 

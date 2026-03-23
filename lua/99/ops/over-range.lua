@@ -10,6 +10,28 @@ local make_observer = CleanUp.make_observer
 local Range = geo.Range
 local Point = geo.Point
 
+--- split the string by space separted chars count
+--- @param str string
+--- @param count number
+--- @returns table<string>
+local function split_and_group(str, count)
+  local words = {}
+  for word in string.gmatch(str, "%S+") do
+    table.insert(words, word)
+  end
+
+  local result = {}
+  for i = 1, #words, count do
+    local group = {}
+    for j = i, math.min(i + count - 1, #words) do
+      table.insert(group, words[j])
+    end
+    table.insert(result, table.concat(group, " "))
+  end
+  return result
+end
+
+
 --- @param context _99.Prompt
 --- @param opts? _99.ops.Opts
 local function over_range(context, opts)
@@ -20,7 +42,12 @@ local function over_range(context, opts)
   local range = data.range
   local top_mark = Mark.mark_above_range(range)
   local bottom_mark = Mark.mark_point(range.buffer, range.end_)
-  context.marks.top_mark = top_mark
+  local top_status_text = "Implementing"
+  if context.is_planning then
+    top_status_text = "Thinking..."
+  else
+    context.marks.top_mark = top_mark
+  end
   context.marks.bottom_mark = bottom_mark
 
   logger:debug(
@@ -31,18 +58,26 @@ local function over_range(context, opts)
     Point.from_mark(bottom_mark)
   )
 
-  local display_ai_status = context._99.ai_stdout_rows > 1
-  local top_status = RequestStatus.new(
+  local display_ai_status = context._99.ai_stdout_rows > 1 or context.is_planning
+  local top_status        = RequestStatus.new(
     250,
     context._99.ai_stdout_rows or 1,
-    "Implementing",
+    top_status_text,
     top_mark
   )
-  local bottom_status = RequestStatus.new(250, 1, "Implementing", bottom_mark)
-  local clean_up = make_clean_up(function()
-    top_status:stop()
+  local bottom_status     = RequestStatus.new(250, 1, "Implementing", bottom_mark)
+  local clean_up          = make_clean_up(function()
+    if not context.is_planning then
+      top_status:stop()
+    else
+      vim.defer_fn(function()
+        top_status:stop()
+        top_mark:delete()
+      end, (30 * 1000))
+    end
     bottom_status:stop()
   end)
+
 
   local system_cmd = context._99.prompts.prompts.visual_selection(range)
   local prompt, refs = make_prompt(context, system_cmd, opts)
@@ -67,7 +102,7 @@ local function over_range(context, opts)
         local valid = top_mark:is_valid() and bottom_mark:is_valid()
         if not valid then
           logger:fatal(
-            -- luacheck: ignore 631
+          -- luacheck: ignore 631
             "the original visual_selection has been destroyed.  You cannot delete the original visual selection during a request"
           )
           return
@@ -79,7 +114,6 @@ local function over_range(context, opts)
           return
         end
 
-        local new_range = Range.from_marks(top_mark, bottom_mark)
         local lines = vim.split(response, "\n")
 
         --- HACK: i am adding a new line here because above range will add a mark to the line above.
@@ -87,13 +121,19 @@ local function over_range(context, opts)
         --- originally take from
         table.insert(lines, 1, "")
 
-        new_range:replace_text(lines)
-        context._99:sync()
+        if not context.is_planning then
+          local new_range = Range.from_marks(top_mark, bottom_mark)
+          new_range:replace_text(lines)
+          context._99:sync()
+        end
       end
     end,
     on_stdout = function(line)
       if display_ai_status then
-        top_status:push(line)
+        for _, l in ipairs(split_and_group(line, 25)) do
+          top_status:push(l)
+          top_status.max_lines = top_status.max_lines + 1
+        end
       end
     end,
   }))

@@ -112,7 +112,9 @@ Always use the temporary file as the place to describe your actions according to
     return [[
 NEVER alter any file other than TEMP_FILE.
 never provide the requested changes as conversational output. Return only the code.
-ONLY provide requested changes by writing the change to TEMP_FILE
+ONLY provide requested changes by writing the change to TEMP_FILE.
+IF and ONLY IF writing the change to TEMP_FILE failed because of user's rejection, RETURN the entire response,
+with the prefix "Writing to TEMP_FILE failed"
 ]]
   end,
   --- @param prompt string

@@ -367,6 +367,21 @@ function _99.visual(opts)
   return context.xid
 end
 
+--- @param opts _99.ops.Opts?
+--- @return _99.TraceID
+--- I visualize and analyze don't replace
+function _99.visual_analyze(opts)
+  opts = process_opts(opts)
+  local context = Prompt.visual_analyze(_99_state)
+  if opts.additional_prompt then
+    context.user_prompt = opts.additional_prompt
+    ops.over_range(context, opts)
+  else
+    capture_prompt(ops.over_range, "Visual", context, opts)
+  end
+  return context.xid
+end
+
 function _99.view_logs()
   local requests = _99_state.tracking.history
   local str_requests = Tracking.to_selectable_list(requests)
