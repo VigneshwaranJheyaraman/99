@@ -13,7 +13,7 @@ local Point = geo.Point
 --- split the string by space separted chars count
 --- @param str string
 --- @param count number
---- @returns table<string>
+--- @returns string[]
 local function split_and_group(str, count)
   local words = {}
   for word in string.gmatch(str, "%S+") do
@@ -58,7 +58,7 @@ local function over_range(context, opts)
     Point.from_mark(bottom_mark)
   )
 
-  local display_ai_status = context._99.ai_stdout_rows > 1 or context.is_planning
+  local display_ai_status = context._99.ai_stdout_rows > 1
   local top_status        = RequestStatus.new(
     250,
     context._99.ai_stdout_rows or 1,
@@ -125,15 +125,21 @@ local function over_range(context, opts)
           local new_range = Range.from_marks(top_mark, bottom_mark)
           new_range:replace_text(lines)
           context._99:sync()
+        else
+          top_status.status_line.title_line = "Done!"
+          top_status.lines = {}
+          for _, line in ipairs(lines) do
+            for _, l in ipairs(split_and_group(line, 25)) do
+              top_status:push(l)
+              top_status.max_lines = top_status.max_lines + 1
+            end
+          end
         end
       end
     end,
     on_stdout = function(line)
       if display_ai_status then
-        for _, l in ipairs(split_and_group(line, 25)) do
-          top_status:push(l)
-          top_status.max_lines = top_status.max_lines + 1
-        end
+        top_status:push(line)
       end
     end,
   }))
